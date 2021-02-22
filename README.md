@@ -1,1 +1,1 @@
-Bee2-rs: implementation of cryptographic library bee2
+Bee2-rs: Rust implementation of cryptographic library bee2
