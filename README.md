@@ -1,4 +1,4 @@
-# Bee2-rs: implementation of cryptographic library bee2
+# Bee2-rs: Rust implementation of cryptographic library bee2
 
 
 # Project structure
@@ -6,4 +6,3 @@
 - bee2_belt:
 - bee2_core:
 - bee2_traits: traits for other packages.
- 
