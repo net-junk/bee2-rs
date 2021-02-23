@@ -1,7 +1,5 @@
 /// The `Hasher` trait specifies an interface common for hasher functions as in original Bee2.
-pub trait Hasher
-{
-    
+pub trait Hasher {
     fn new() -> Self;
 
     /// Hashing block of data.
@@ -13,11 +11,11 @@ pub trait Hasher
     fn step_g(&mut self, hash: &mut [u8]);
 
     ///
-    fn step_v(self, hash: impl AsRef<[u8]>);
+    fn step_v(&mut self, hash: impl AsRef<[u8]>) -> bool;
 
     ///
-    fn hash(hash: impl AsRef<[u8]>, src: impl AsRef<[u8]>);
+    fn hash(hash:&mut [u8], src: impl AsRef<[u8]>);
 
     /// Get output size of the hasher
-    fn output_size() -> usize;
+    fn output_size(&self) -> usize;
 }
