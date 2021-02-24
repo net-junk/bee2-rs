@@ -8,3 +8,16 @@ edition = "2018"
 
 [dependencies]
 bee2_traits = { path = "../bee2_traits", version = "" }
+rand = ""
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "bee2_bash"
+path = "benches/lib.rs"
+harness = false
+
+
+[features]
+go-faster = []

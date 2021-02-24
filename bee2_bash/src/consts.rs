@@ -26,12 +26,12 @@ static C: [u64; 24] = [
 ];
 
 #[inline]
-fn P0(x: u64) -> u64 {
+fn p0(x: u64) -> u64 {
     x
 }
 
 #[inline]
-fn P1(x: u64) -> u64 {
+fn p1(x: u64) -> u64 {
     if x < 8 {
         8 + (x + 2 * (x & 1) + 7) % 8
     } else if x < 16 {
@@ -42,27 +42,27 @@ fn P1(x: u64) -> u64 {
 }
 
 #[inline]
-fn P2(x: u64) -> u64 {
-    P1(P1(x))
+fn p2(x: u64) -> u64 {
+    p1(p1(x))
 }
 
 #[inline]
-fn P3(x: u64) -> u64 {
+fn p3(x: u64) -> u64 {
     8 * (x / 8) + (x % 8 + 4) % 8
 }
 
 #[inline]
-fn P4(x: u64) -> u64 {
-    P1(P3(x))
+fn p4(x: u64) -> u64 {
+    p1(p3(x))
 }
 
 #[inline]
-fn P5(x: u64) -> u64 {
-    P2(P3(x))
+fn p5(x: u64) -> u64 {
+    p2(p3(x))
 }
 
 #[inline]
-fn bashS(s: &mut [u64; 24], w0_: usize, w1_: usize, w2_: usize, m1: u8, n1: u8, m2: u8, n2: u8) {
+fn bash_s(s: &mut [u64; 24], w0_: usize, w1_: usize, w2_: usize, m1: u8, n1: u8, m2: u8, n2: u8) {
     let mut t0: u64;
     let mut t1: u64;
     let mut t2: u64;
@@ -83,7 +83,7 @@ fn bashS(s: &mut [u64; 24], w0_: usize, w1_: usize, w2_: usize, m1: u8, n1: u8, 
 
 /// A1. Test
 #[test]
-fn bashS_test() {
+fn bash_s_test() {
     let w0 = 0xB194BAC80A08F53Bu64.to_be();
     let w1 = 0xE12BDC1AE28257ECu64.to_be();
     let w2 = 0xE9DEE72C8F0C0FA6u64.to_be();
@@ -101,7 +101,7 @@ fn bashS_test() {
     s[0] = w0;
     s[1] = w1;
     s[2] = w2;
-    bashS(&mut s, 0, 1, 2, m1, n1, m2, n2);
+    bash_s(&mut s, 0, 1, 2, m1, n1, m2, n2);
 
     assert_eq!(w0_, s[0]);
     assert_eq!(w1_, s[1]);
@@ -109,8 +109,8 @@ fn bashS_test() {
 }
 
 #[inline]
-fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64, i: u8) {
-    bashS(
+fn bash_r(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64, i: u8) {
+    bash_s(
         s,
         p(0) as usize,
         p(8) as usize,
@@ -120,7 +120,7 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
         14,
         1,
     );
-    bashS(
+    bash_s(
         s,
         p(1) as usize,
         p(9) as usize,
@@ -130,7 +130,7 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
         34,
         7,
     );
-    bashS(
+    bash_s(
         s,
         p(2) as usize,
         p(10) as usize,
@@ -140,7 +140,7 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
         46,
         49,
     );
-    bashS(
+    bash_s(
         s,
         p(3) as usize,
         p(11) as usize,
@@ -150,7 +150,7 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
         2,
         23,
     );
-    bashS(
+    bash_s(
         s,
         p(4) as usize,
         p(12) as usize,
@@ -160,7 +160,7 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
         14,
         33,
     );
-    bashS(
+    bash_s(
         s,
         p(5) as usize,
         p(13) as usize,
@@ -170,7 +170,7 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
         34,
         39,
     );
-    bashS(
+    bash_s(
         s,
         p(6) as usize,
         p(14) as usize,
@@ -180,7 +180,7 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
         46,
         17,
     );
-    bashS(
+    bash_s(
         s,
         p(7) as usize,
         p(15) as usize,
@@ -194,37 +194,37 @@ fn bashR(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64,
 }
 
 #[inline]
-pub fn bashF0(s: &mut [u64; 24]) {
-    bashR(s, &P0, &P1, 1);
-    bashR(s, &P1, &P2, 2);
-    bashR(s, &P2, &P3, 3);
-    bashR(s, &P3, &P4, 4);
-    bashR(s, &P4, &P5, 5);
-    bashR(s, &P5, &P0, 6);
-    bashR(s, &P0, &P1, 7);
-    bashR(s, &P1, &P2, 8);
-    bashR(s, &P2, &P3, 9);
-    bashR(s, &P3, &P4, 10);
-    bashR(s, &P4, &P5, 11);
-    bashR(s, &P5, &P0, 12);
-    bashR(s, &P0, &P1, 13);
-    bashR(s, &P1, &P2, 14);
-    bashR(s, &P2, &P3, 15);
-    bashR(s, &P3, &P4, 16);
-    bashR(s, &P4, &P5, 17);
-    bashR(s, &P5, &P0, 18);
-    bashR(s, &P0, &P1, 19);
-    bashR(s, &P1, &P2, 20);
-    bashR(s, &P2, &P3, 21);
-    bashR(s, &P3, &P4, 22);
-    bashR(s, &P4, &P5, 23);
-    bashR(s, &P5, &P0, 24);
+pub fn bash_f0(s: &mut [u64; 24]) {
+    bash_r(s, &p0, &p1, 1);
+    bash_r(s, &p1, &p2, 2);
+    bash_r(s, &p2, &p3, 3);
+    bash_r(s, &p3, &p4, 4);
+    bash_r(s, &p4, &p5, 5);
+    bash_r(s, &p5, &p0, 6);
+    bash_r(s, &p0, &p1, 7);
+    bash_r(s, &p1, &p2, 8);
+    bash_r(s, &p2, &p3, 9);
+    bash_r(s, &p3, &p4, 10);
+    bash_r(s, &p4, &p5, 11);
+    bash_r(s, &p5, &p0, 12);
+    bash_r(s, &p0, &p1, 13);
+    bash_r(s, &p1, &p2, 14);
+    bash_r(s, &p2, &p3, 15);
+    bash_r(s, &p3, &p4, 16);
+    bash_r(s, &p4, &p5, 17);
+    bash_r(s, &p5, &p0, 18);
+    bash_r(s, &p0, &p1, 19);
+    bash_r(s, &p1, &p2, 20);
+    bash_r(s, &p2, &p3, 21);
+    bash_r(s, &p3, &p4, 22);
+    bash_r(s, &p4, &p5, 23);
+    bash_r(s, &p5, &p0, 24);
 }
 
 /// A2. Test
 #[test]
-fn bashF0_test() {
-    let mut S = [
+fn bash_f0_test() {
+    let mut s = [
         0xB194BAC80A08F53Bu64.to_be(),
         0x366D008E584A5DE4u64.to_be(),
         0x8504FA9D1BB6C7ACu64.to_be(),
@@ -251,7 +251,7 @@ fn bashF0_test() {
         0x2687F93490405511u64.to_be(),
     ];
 
-    let S_ = [
+    let s_ = [
         0x8FE727775EA7F140u64.to_be(),
         0xB95BB6A200CBB28Cu64.to_be(),
         0x7F0809C0C0BC68B7u64.to_be(),
@@ -277,6 +277,6 @@ fn bashF0_test() {
         0x4972ACD9D976214Bu64.to_be(),
         0x7CED8E3F8B6E058Eu64.to_be(),
     ];
-    bashF0(&mut S);
-    assert_eq!(S, S_);
+    bash_f0(&mut s);
+    assert_eq!(s, s_);
 }

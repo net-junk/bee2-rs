@@ -17,5 +17,5 @@ pub trait Hasher {
     fn hash(hash:&mut [u8], src: impl AsRef<[u8]>);
 
     /// Get output size of the hasher
-    fn output_size(&self) -> usize;
+    fn output_size() -> usize;
 }
