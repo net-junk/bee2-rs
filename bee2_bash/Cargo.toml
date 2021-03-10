@@ -11,7 +11,7 @@ bee2_traits = { path = "../bee2_traits", version = "" }
 rand = ""
 
 [dev-dependencies]
-criterion = "0.3"
+criterion_bencher_compat = "0.3"
 
 [[bench]]
 name = "bee2_bash"

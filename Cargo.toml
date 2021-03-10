@@ -10,3 +10,4 @@ edition = "2018"
 
 bee2_bash = { path = "bee2_bash", version = "" }
 bee2_belt = { path = "bee2_belt", version = "" }
+bee2_traits = { path = "bee2_traits", version = "" }
