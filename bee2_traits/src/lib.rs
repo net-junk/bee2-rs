@@ -20,6 +20,19 @@ pub trait Hasher {
     fn output_size() -> usize;
 }
 
+/// The `PrgHasher` trait specifies an interface common for all PrgHashers.
+pub trait PrgHasher {
+    /// PrgHasher initializing.
+    /// ann - annotation, ann.len() % 4 == 0 && ann.len() <= 60 
+    fn new(ann: impl AsRef<[u8]>) -> Self;
+
+    /// Calculate hash
+    /// # Arguments
+    /// data - data(message) to hash
+    /// hash - output container.
+    fn hash(&mut self, data: impl AsRef<[u8]>, hash: &mut [u8]);
+}
+
 /// The `PrgStart` trait specifies an interface for command `start`.
 pub trait PrgStart {
     /// Automaton initializing.

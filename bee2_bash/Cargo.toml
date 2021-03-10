@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 bee2_traits = { path = "../bee2_traits", version = "" }
 rand = ""
+generic-array = "0.14"
 
 [dev-dependencies]
 criterion_bencher_compat = "0.3"
