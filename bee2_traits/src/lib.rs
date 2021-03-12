@@ -23,14 +23,50 @@ pub trait Hasher {
 /// The `PrgHasher` trait specifies an interface common for all PrgHashers.
 pub trait PrgHasher {
     /// PrgHasher initializing.
-    /// ann - annotation, ann.len() % 4 == 0 && ann.len() <= 60 
+    /// ann - annotation, ann.len() % 4 == 0 && ann.len() <= 60
     fn new(ann: impl AsRef<[u8]>) -> Self;
 
-    /// Calculate hash
+    /// Calculate hash.
     /// # Arguments
     /// data - data(message) to hash
     /// hash - output container.
     fn hash(&mut self, data: impl AsRef<[u8]>, hash: &mut [u8]);
+}
+
+/// The `PrgAEAD` trait specifies an interface common for all AEADs(authenticated encryption with associated data).
+pub trait PrgAEAD {
+    /// PrgAE initializing.
+    /// ann - annotation, ann.len() % 4 == 0 && ann.len() <= 60
+    /// key - key, key.len() % 4 == 0 && key.len() <= 60, key.len() == 0 || key.len() >= l / 8
+    fn new(ann: impl AsRef<[u8]>, key: impl AsRef<[u8]>) -> Self;
+
+    /// Encrypt data.
+    /// plaintext - data to encrypt.
+    /// header - associated data.
+    /// ciphertext - to store result, len(ciphertext) == len(plaintext).
+    /// tag - authentication tag(message authentication code).
+    ///
+    fn encrypt(
+        &mut self,
+        plaintext: impl AsRef<[u8]>,
+        header: impl AsRef<[u8]>,
+        ciphertext: &mut [u8],
+        tag: &mut [u8],
+    );
+
+    /// Decrypt data.
+    /// ciphertext - data to decrypt.
+    /// header - associated data.
+    /// tag - authentication tag(message authentication code).
+    /// plaintext - to store result.
+    ///
+    fn decrypt(
+        &mut self,
+        ciphertext: impl AsRef<[u8]>,
+        header: impl AsRef<[u8]>,
+        tag: impl AsRef<[u8]>,
+        plaintext: &mut [u8],
+    );
 }
 
 /// The `PrgStart` trait specifies an interface for command `start`.

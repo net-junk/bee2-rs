@@ -3,7 +3,10 @@ extern crate bee2_traits;
 use crate::consts::bash_f0;
 pub use bee2_traits::*;
 use core::marker::PhantomData;
-use generic_array::{ArrayLength, typenum::{U1, U2, U256, U384, U512}};
+use generic_array::{
+    typenum::{U1, U128, U192, U2, U256},
+    ArrayLength,
+};
 use std::convert::TryInto;
 
 #[allow(non_camel_case_types)]
@@ -108,10 +111,9 @@ impl PrgStart for BashPrg {
         s[1 + ann.len()..1 + ann.len() + key.len()].copy_from_slice(&key[..]);
         // s[1472..) <- <l / 4 + d>_{64}
         s[192 - 8] = (l / 4 + d) as u8;
-        println!("Start s: {:X?}", s);
         // s[pos..) <- 0
         // s[pos..].iter_mut().for_each(|x| *x = 0);
-
+        println!("Start s: {:X?}, l: {:?}, d: {:?}", s, l, d);
         return BashPrg {
             state: BashPrgState {
                 l: l,
@@ -432,7 +434,7 @@ impl Prg for BashPrg {
 
 /// Block 8.11 Programming
 //#[allow(non_camel_case_types)]
-fn programming(
+pub fn programming(
     K: impl AsRef<[u8]>,
     I: impl AsRef<[u8]>,
     A1: impl AsRef<[u8]>,
@@ -492,13 +494,76 @@ where
     }
 }
 
-pub type BashPrgHash2561 = BashPrgHash<U256, U1>;
-pub type BashPrgHash2562 = BashPrgHash<U256, U2>;
-pub type BashPrgHash3841 = BashPrgHash<U384, U1>;
-pub type BashPrgHash3842 = BashPrgHash<U384, U2>;
-pub type BashPrgHash5121 = BashPrgHash<U512, U1>;
-pub type BashPrgHash5122 = BashPrgHash<U512, U2>;
+pub type BashPrgHash2561 = BashPrgHash<U128, U1>;
+pub type BashPrgHash2562 = BashPrgHash<U128, U2>;
+pub type BashPrgHash3841 = BashPrgHash<U192, U1>;
+pub type BashPrgHash3842 = BashPrgHash<U192, U2>;
+pub type BashPrgHash5121 = BashPrgHash<U256, U1>;
+pub type BashPrgHash5122 = BashPrgHash<U256, U2>;
 
+#[derive(Clone)]
+pub struct BashPrgAEAD<SecurityLevel, Capacity>
+where
+    SecurityLevel: ArrayLength<u8>,
+    Capacity: ArrayLength<u8>,
+{
+    prg: BashPrg,
+    l: PhantomData<SecurityLevel>,
+    d: PhantomData<Capacity>,
+}
+
+impl<L, D> PrgAEAD for BashPrgAEAD<L, D>
+where
+    L: ArrayLength<u8>,
+    D: ArrayLength<u8>,
+{
+    fn new(ann: impl AsRef<[u8]>, key: impl AsRef<[u8]>) -> Self {
+        BashPrgAEAD {
+            l: Default::default(),
+            d: Default::default(),
+            prg: BashPrg::start(L::to_usize(), D::to_usize() as usize, ann, key),
+        }
+    }
+
+    fn encrypt(
+        &mut self,
+        plaintext: impl AsRef<[u8]>,
+        header: impl AsRef<[u8]>,
+        ciphertext: &mut [u8],
+        tag: &mut [u8],
+    ) {
+        self.prg.absorb(header);
+        ciphertext.clone_from_slice(&plaintext.as_ref());
+        self.prg.encr(ciphertext);
+        self.prg.squeeze(tag);
+    }
+
+    fn decrypt(
+        &mut self,
+        ciphertext: impl AsRef<[u8]>,
+        header: impl AsRef<[u8]>,
+        tag_: impl AsRef<[u8]>,
+        plaintext: &mut [u8],
+    ) {
+        self.prg.absorb(header);
+        plaintext.clone_from_slice(&ciphertext.as_ref());
+        self.prg.decr(plaintext);
+        let tag = tag_.as_ref();
+        let mut tag_get: Box<[u8]> = vec![0; tag.len()].into_boxed_slice();
+        self.prg.squeeze(tag_get.as_mut());
+        if tag_get.as_ref().eq(tag) == false {
+            plaintext.iter_mut().for_each(|x| *x = 0);
+            panic!(format!("Incorrect tag").to_owned());
+        }
+    }
+}
+
+pub type BashPrgAEAD2561 = BashPrgAEAD<U128, U1>;
+pub type BashPrgAEAD2562 = BashPrgAEAD<U128, U2>;
+pub type BashPrgAEAD3841 = BashPrgAEAD<U192, U1>;
+pub type BashPrgAEAD3842 = BashPrgAEAD<U192, U2>;
+pub type BashPrgAEAD5121 = BashPrgAEAD<U256, U1>;
+pub type BashPrgAEAD5122 = BashPrgAEAD<U256, U2>;
 
 #[cfg(test)]
 mod test {
@@ -577,19 +642,184 @@ mod test {
         assert_eq!(Y2, unsafe { *(y2_.as_ptr() as *const [u8; 23]) });
     }
 
-    // #[test]
-    // fn hash_test_128_0() {
-    //     let l_128_0 = [
-    //         0x114C3DFAE373D9BCu64.to_be(),
-    //         0xBC3602D6386F2D6Au64.to_be(),
-    //         0x2059BA1BF9048DBAu64.to_be(),
-    //         0xA5146A6CB775709Du64.to_be(),
-    //     ];
+    /// A.5 (l,d) = (128,2), m = 0
+    #[test]
+    fn hash_test_128_2_0() {
+        let l_128_2 = [
+            0x36FA075EC15721F2u64.to_be(),
+            0x50B9A641A8CB99A3u64.to_be(),
+            0x33A9EE7BA8586D06u64.to_be(),
+            0x46CBAC3686C03DF3u64.to_be(),
+        ];
+        let mut hash: [u8; 32] = [0; 32];
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-    //     let mut hash: [u8; 32] = Default::default();
-    //     let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+        let mut hasher = BashPrgHash2562::new([]);
+        hasher.hash(&s[..0], &mut hash);
 
-    //     Bash256::hash(&mut hash, &s[..0]);
-    //     assert_eq!(hash, unsafe { *(l_128_0.as_ptr() as *const [u8; 32]) });
-    // }
+        assert_eq!(hash, unsafe { *(l_128_2.as_ptr() as *const [u8; 32]) });
+    }
+
+    /// A.5 (l,d) = (128,2), m = 127
+    #[test]
+    fn hash_test_128_2_127() {
+        let l_128_2_127 = [
+            0xC930FF427307420Du64.to_be(),
+            0xA6E4182969AA1FFCu64.to_be(),
+            0x3310179B8A0EDB3Eu64.to_be(),
+            0x20BEC285B568BA17u64.to_be(),
+        ];
+        let mut hash: [u8; 32] = [0; 32];
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+
+        let mut hasher = BashPrgHash2562::new([]);
+        hasher.hash(&s[..127], &mut hash);
+
+        assert_eq!(hash, unsafe { *(l_128_2_127.as_ptr() as *const [u8; 32]) });
+    }
+
+    /// A.5 (l,d) = (128,2), m = 128
+    #[test]
+    fn hash_test_128_2_128() {
+        let l_128_2_128 = [
+            0x92AD1402C2007191u64.to_be(),
+            0xF2F7CFAD6A2F8807u64.to_be(),
+            0xBB0C50F73DFF95EFu64.to_be(),
+            0x1B8AF08504D54007u64.to_be(),
+        ];
+        let mut hash: [u8; 32] = [0; 32];
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+
+        let mut hasher = BashPrgHash2562::new([]);
+        hasher.hash(&s[..128], &mut hash);
+
+        assert_eq!(hash, unsafe { *(l_128_2_128.as_ptr() as *const [u8; 32]) });
+    }
+
+    /// A.5 (l,d) = (128,2), m = 150
+    #[test]
+    fn hash_test_128_2_150() {
+        let l_128_2_150 = [
+            0x48DB61832CA10090u64.to_be(),
+            0x03BC0D8BDE67893Au64.to_be(),
+            0x9DC683C48A5BC23Au64.to_be(),
+            0xC884EB4613B480A6u64.to_be(),
+        ];
+        let mut hash: [u8; 32] = [0; 32];
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+
+        let mut hasher = BashPrgHash2562::new([]);
+        hasher.hash(&s[..150], &mut hash);
+
+        assert_eq!(hash, unsafe { *(l_128_2_150.as_ptr() as *const [u8; 32]) });
+    }
+
+    /// A.5 (l,d) = (192,1), m = 143
+    #[test]
+    fn hash_test_192_1_143() {
+        let l_ = [
+            0x6166032D6713D401u64.to_be(),
+            0xA6BC687CCFFF2E60u64.to_be(),
+            0x3287143A84C78D2Cu64.to_be(),
+            0x62C71551E0E2FB2Au64.to_be(),
+            0xF6B799EE33B5DECDu64.to_be(),
+            0x7F62F190B1FBB052u64.to_be(),
+        ];
+        let mut hash: [u8; 48] = [0; 48];
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+
+        let mut hasher = BashPrgHash3841::new([]);
+        hasher.hash(&s[..143], &mut hash);
+
+        assert_eq!(hash, unsafe { *(l_.as_ptr() as *const [u8; 48]) });
+    }
+
+    /// A.5 (l,d) = (192,1), m = 144
+    #[test]
+    fn hash_test_192_1_144() {
+        let l_ = [
+            0x8D84C82ECD0AB646u64.to_be(),
+            0x8CC451CFC5EEB3B2u64.to_be(),
+            0x98DFD381D200DA69u64.to_be(),
+            0xFBED5AE67D26BAD5u64.to_be(),
+            0xC727E2652A225BF4u64.to_be(),
+            0x65993043039E338Bu64.to_be(),
+        ];
+        let mut hash: [u8; 48] = [0; 48];
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+
+        let mut hasher = BashPrgHash3841::new([]);
+        hasher.hash(&s[..144], &mut hash);
+
+        assert_eq!(hash, unsafe { *(l_.as_ptr() as *const [u8; 48]) });
+    }
+
+    /// A.5 (l,d) = (192,1), m = 150
+    #[test]
+    fn hash_test_192_1_150() {
+        let l_ = [
+            0x47529F9D499AB6ABu64.to_be(),
+            0x8AD72B1754C90C39u64.to_be(),
+            0xE7DA237BEB16CDFCu64.to_be(),
+            0x00FE87934F5AFC11u64.to_be(),
+            0x01862DFA50560F06u64.to_be(),
+            0x2A4DAC859CC13DBCu64.to_be(),
+        ];
+        let mut hash: [u8; 48] = [0; 48];
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+
+        let mut hasher = BashPrgHash3841::new([]);
+        hasher.hash(&s[..150], &mut hash);
+
+        assert_eq!(hash, unsafe { *(l_.as_ptr() as *const [u8; 48]) });
+    }
+
+    /// A.6 (l,d) = (256,1)
+    #[test]
+    fn aead_test() {
+        let y_ = [
+            0x690673766C3E848Cu64.to_be(),
+            0xAC7C05169FFB7B77u64.to_be(),
+            0x51E52A011040E560u64.to_be(),
+            0x2573FAF991044A00u64.to_be(),
+            0x4329EEF7BED8E687u64.to_be(),
+            0x5830A91854D1BD2Eu64.to_be(),
+            0xDC6FC2FF37851DBAu64.to_be(),
+            0xC249DF400A0549EAu64.to_be(),
+            0x2E0C811D499E1FF1u64.to_be(),
+            0xE5E32FAE7F0532FAu64.to_be(),
+            0x4051D0F9E300D9B1u64.to_be(),
+            0xDBF119AC8CFFC48Du64.to_be(),
+            0xD3CBF1CA0DBA5DD9u64.to_be(),
+            0x7481C88DF0BE4127u64.to_be(),
+            0x85E40988B3158553u64.to_be(),
+            0x7948B80F5A9C49E0u64.to_be(),
+            0x8DD684A7DCA871C3u64.to_be(),
+            0x80DFDC4C4DFBE61Fu64.to_be(),
+            0x50D2D0FBD24D8B9Du64.to_be(),
+            0x32974A347247D001u64.to_be(),
+            0xBAD5B16844002569u64.to_be(),
+            0x3967E77394DC088Bu64.to_be(),
+            0x0ECCFA8D291BA13Du64.to_be(),
+            0x44F60B06E2EDB351u64.to_be(),
+        ];
+
+        let mut x: [u8; 192] = [0; 192];
+        let mut y: [u8; 192] = [0; 192];
+        let mut t: [u8; 32] = [0; 32];
+
+        let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
+
+        println!("A {:X?}", &s[0..16]);
+        println!("K {:X?}", &s[32..64]);
+        println!("I {:X?}", &s[64..113]);
+
+
+        let mut aead = BashPrgAEAD5121::new(&s[0..16], &s[32..64]);
+        aead.encrypt(x, &s[64..109],&mut y, &mut t);
+        println!("I {:X?}", y);
+        println!("I {:X?}", t);
+
+        assert_eq!(y, unsafe { *(y_.as_ptr() as *const [u8; 192]) });
+    }
 }
