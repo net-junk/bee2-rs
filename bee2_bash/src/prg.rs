@@ -73,11 +73,8 @@ impl BashPrg {
     fn prg_commit(&mut self, code: u8) {
         self.state.s[self.state.pos] ^= code;
         self.state.s[self.state.buff_len] ^= 0x80;
-        println!("Buff Len: {:?}", self.state.buff_len);
-        println!("Commit: {:X?}", self.state.s);
         BashPrgState::bash_f(&mut self.state.s);
         self.state.pos = 0;
-        println!("CommitA: {:X?}", self.state.s);
     }
 }
 
@@ -113,7 +110,6 @@ impl PrgStart for BashPrg {
         s[192 - 8] = (l / 4 + d) as u8;
         // s[pos..) <- 0
         // s[pos..].iter_mut().for_each(|x| *x = 0);
-        println!("Start s: {:X?}, l: {:?}, d: {:?}", s, l, d);
         return BashPrg {
             state: BashPrgState {
                 l: l,
@@ -131,7 +127,7 @@ impl PrgStart for BashPrg {
 }
 
 impl BashPrg {
-    fn new(l: usize, d: usize, ann_: impl AsRef<[u8]>, key_: impl AsRef<[u8]>) -> Self {
+    pub fn new(l: usize, d: usize, ann_: impl AsRef<[u8]>, key_: impl AsRef<[u8]>) -> Self {
         return BashPrg::start(l, d, ann_, key_);
     }
 }
@@ -293,13 +289,10 @@ impl PrgEncr for BashPrg {
         let mut count = buf.len();
 
         if count < self.state.buff_len - self.state.pos {
-            println!("Encrypt!! {:?}", count);
-            println!("Encrypts!: {:X?}", buf);
             mem_xor(
                 &mut self.state.s[self.state.pos..self.state.pos + count],
                 buf,
             );
-            println!("Encrypt!: {:X?}", self.state.s);
             mem_cpy(buf, &self.state.s[self.state.pos..self.state.pos + count]);
             self.state.pos += count;
             return;
@@ -433,34 +426,33 @@ impl Prg for BashPrg {
 }
 
 /// Block 8.11 Programming
-//#[allow(non_camel_case_types)]
 pub fn programming(
-    K: impl AsRef<[u8]>,
-    I: impl AsRef<[u8]>,
-    A1: impl AsRef<[u8]>,
-    A2: impl AsRef<[u8]>,
-    Y1: &mut [u8],
-    Y2: &mut [u8],
-    K1: &mut [u8],
+    k: impl AsRef<[u8]>,
+    i: impl AsRef<[u8]>,
+    a1: impl AsRef<[u8]>,
+    a2: impl AsRef<[u8]>,
+    y1: &mut [u8],
+    y2: &mut [u8],
+    k1: &mut [u8],
 ) {
     // Step 1.
-    let mut alpha = BashPrg::start(256, 2, [], K);
+    let mut alpha = BashPrg::start(256, 2, [], k);
     // Step 2.
-    alpha.absorb(I);
+    alpha.absorb(i);
     // Step 3.
     alpha.ratchet();
     // Step 4.
-    alpha.squeeze(K1);
+    alpha.squeeze(k1);
     // Step 5.
-    let mut beta = BashPrg::start(128, 1, A1, K1);
+    let mut beta = BashPrg::start(128, 1, a1, k1);
     // Step 6.
     let mut gamma = beta;
     // Step 7.
-    gamma.restart(A2, []);
+    gamma.restart(a2, []);
     // Step 8.
-    beta.encr(Y1);
+    beta.encr(y1);
     // Step 9.
-    gamma.encr(Y2);
+    gamma.encr(y2);
 }
 
 #[derive(Clone)]
@@ -613,33 +605,25 @@ mod test {
         ];
 
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
-        let mut Y1: [u8; 23] = [0; 23];
-        let mut Y2: [u8; 23] = [0; 23];
-        let mut K1: [u8; 16] = [0; 16];
-        Y1[..].copy_from_slice(&s[160..183]);
-        Y2[..].copy_from_slice(&s[160..183]);
+        let mut y1: [u8; 23] = [0; 23];
+        let mut y2: [u8; 23] = [0; 23];
+        let mut k1: [u8; 16] = [0; 16];
+        y1[..].copy_from_slice(&s[160..183]);
+        y2[..].copy_from_slice(&s[160..183]);
 
-        println!("X {:X?}", Y1);
-        println!("K {:X?}", &s[0..32]);
-        println!("I {:X?}", &s[32..127]);
-        println!("A1 {:X?}", &s[128..144]);
-        println!("A2 {:X?}", &s[144..148]);
         programming(
             &s[0..32],
             &s[32..127],
             &s[128..144],
             &s[144..148],
-            &mut Y1,
-            &mut Y2,
-            &mut K1,
+            &mut y1,
+            &mut y2,
+            &mut k1,
         );
 
-        println!("K1 {:X?}", K1);
-        println!("Y1 {:X?}", Y1);
-        println!("Y2 {:X?}", Y2);
-        assert_eq!(K1, unsafe { *(k1_.as_ptr() as *const [u8; 16]) });
-        assert_eq!(Y1, unsafe { *(y1_.as_ptr() as *const [u8; 23]) });
-        assert_eq!(Y2, unsafe { *(y2_.as_ptr() as *const [u8; 23]) });
+        assert_eq!(k1, unsafe { *(k1_.as_ptr() as *const [u8; 16]) });
+        assert_eq!(y1, unsafe { *(y1_.as_ptr() as *const [u8; 23]) });
+        assert_eq!(y2, unsafe { *(y2_.as_ptr() as *const [u8; 23]) });
     }
 
     /// A.5 (l,d) = (128,2), m = 0
@@ -804,21 +788,14 @@ mod test {
             0x44F60B06E2EDB351u64.to_be(),
         ];
 
-        let mut x: [u8; 192] = [0; 192];
+        let x: [u8; 192] = [0; 192];
         let mut y: [u8; 192] = [0; 192];
         let mut t: [u8; 32] = [0; 32];
 
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        println!("A {:X?}", &s[0..16]);
-        println!("K {:X?}", &s[32..64]);
-        println!("I {:X?}", &s[64..113]);
-
-
         let mut aead = BashPrgAEAD5121::new(&s[0..16], &s[32..64]);
-        aead.encrypt(x, &s[64..109],&mut y, &mut t);
-        println!("I {:X?}", y);
-        println!("I {:X?}", t);
+        aead.encrypt(x, &s[64..113], &mut y, &mut t);
 
         assert_eq!(y, unsafe { *(y_.as_ptr() as *const [u8; 192]) });
     }
