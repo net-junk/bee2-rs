@@ -1,6 +1,6 @@
 extern crate criterion;
 
-use bee2_bash::{Bash256, Bash384, Bash512};
+use bee2_bash::{Bash256, Bash384, Bash512, bash_f0};
 use bee2_bash::{
     BashPrgAEAD2561, BashPrgAEAD2562, BashPrgAEAD3841, BashPrgAEAD3842, BashPrgAEAD5121,
     BashPrgAEAD5122,
@@ -28,6 +28,10 @@ fn bash_512(bytes: &[u8]) {
     basher.step_h(&bytes);
 }
 
+fn bashf_test(bytes: &mut [u64; 24]) {
+    bash_f0(bytes)
+}
+
 
 fn bench_bash(c: &mut Criterion) {
     let mut bytes: [u8; 1024] = [0; 1024];
@@ -38,6 +42,14 @@ fn bench_bash(c: &mut Criterion) {
     group.bench_function("bash256", |b| b.iter(|| bash_256(&bytes)));
     group.bench_function("bash384", |b| b.iter(|| bash_384(&bytes)));
     group.bench_function("bash512", |b| b.iter(|| bash_512(&bytes)));
+    group.finish();
+
+    let mut block: [u64; 24] = [0; 24];
+    thread_rng().fill(&mut block[..]);
+
+    let mut group = c.benchmark_group("primitiveBench");
+    group.throughput(Throughput::Bytes((block.len() * 8) as u64));
+    group.bench_function("f0", |b| b.iter(|| bashf_test(&mut block)));
     group.finish();
 
     // let mut group = c.benchmark_group("BasPrghBench");

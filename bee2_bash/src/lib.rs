@@ -2,7 +2,7 @@ mod consts;
 mod hash;
 mod prg;
 
-pub use crate::consts::bash_f0;
+pub use crate::consts::{bash_f0};
 pub use crate::hash::{Bash256, Bash384, Bash512};
 pub use crate::prg::{
     programming, BashPrg, BashPrgAEAD, BashPrgAEAD2561, BashPrgAEAD2562, BashPrgAEAD3841,
