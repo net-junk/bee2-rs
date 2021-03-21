@@ -1,21 +1,11 @@
+mod consts;
+mod hash;
+mod prg;
 
-
-extern crate bee2_traits;
-
-pub use bee2_traits::{Hasher};
-
-#[derive(Clone)]
-struct BashState {
-    /// Current state.
-    s: [u8; 192],
-    /// Copy of s1.
-    s1: [u8; 192],
-    /// Size(length) of buffer.
-    buff_len: usize,
-    /// Current position in buffer.
-    pos: usize,
-    // /// ?
-    // stack: &[u8],
-}
-
-
+pub use crate::consts::bash_f0;
+pub use crate::hash::{Bash256, Bash384, Bash512};
+pub use crate::prg::{
+    programming, BashPrg, BashPrgAEAD, BashPrgAEAD2561, BashPrgAEAD2562, BashPrgAEAD3841,
+    BashPrgAEAD3842, BashPrgAEAD5121, BashPrgAEAD5122, BashPrgHash2561, BashPrgHash2562,
+    BashPrgHash3841, BashPrgHash3842, BashPrgHash5121, BashPrgHash5122,
+};
