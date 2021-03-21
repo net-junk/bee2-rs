@@ -108,7 +108,9 @@ fn bash_s_test() {
     assert_eq!(w2_, s[2]);
 }
 
+
 #[inline]
+#[allow(dead_code)]
 fn bash_r(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64, i: u8) {
     bash_s(
         s,
@@ -193,32 +195,118 @@ fn bash_r(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64
     s[p_next(23) as usize] ^= C[(i - 1) as usize];
 }
 
+macro_rules! bash_r {
+    ($s: expr, $p:expr,$p_next:expr, $i:expr) => {{
+        bash_s(
+            $s,
+            $p(0) as usize,
+            $p(8) as usize,
+            $p(16) as usize,
+            8,
+            53,
+            14,
+            1,
+        );
+        bash_s(
+            $s,
+            $p(1) as usize,
+            $p(9) as usize,
+            $p(17) as usize,
+            56,
+            51,
+            34,
+            7,
+        );
+        bash_s(
+            $s,
+            $p(2) as usize,
+            $p(10) as usize,
+            $p(18) as usize,
+            8,
+            37,
+            46,
+            49,
+        );
+        bash_s(
+            $s,
+            $p(3) as usize,
+            $p(11) as usize,
+            $p(19) as usize,
+            56,
+            3,
+            2,
+            23,
+        );
+        bash_s(
+            $s,
+            $p(4) as usize,
+            $p(12) as usize,
+            $p(20) as usize,
+            8,
+            21,
+            14,
+            33,
+        );
+        bash_s(
+            $s,
+            $p(5) as usize,
+            $p(13) as usize,
+            $p(21) as usize,
+            56,
+            19,
+            34,
+            39,
+        );
+        bash_s(
+            $s,
+            $p(6) as usize,
+            $p(14) as usize,
+            $p(22) as usize,
+            8,
+            5,
+            46,
+            17,
+        );
+        bash_s(
+            $s,
+            $p(7) as usize,
+            $p(15) as usize,
+            $p(23) as usize,
+            56,
+            35,
+            2,
+            55,
+        );
+        $s[$p_next(23) as usize] ^= C[($i - 1) as usize];
+    }};
+}
+
 #[inline]
 pub fn bash_f0(s: &mut [u64; 24]) {
-    bash_r(s, &p0, &p1, 1);
-    bash_r(s, &p1, &p2, 2);
-    bash_r(s, &p2, &p3, 3);
-    bash_r(s, &p3, &p4, 4);
-    bash_r(s, &p4, &p5, 5);
-    bash_r(s, &p5, &p0, 6);
-    bash_r(s, &p0, &p1, 7);
-    bash_r(s, &p1, &p2, 8);
-    bash_r(s, &p2, &p3, 9);
-    bash_r(s, &p3, &p4, 10);
-    bash_r(s, &p4, &p5, 11);
-    bash_r(s, &p5, &p0, 12);
-    bash_r(s, &p0, &p1, 13);
-    bash_r(s, &p1, &p2, 14);
-    bash_r(s, &p2, &p3, 15);
-    bash_r(s, &p3, &p4, 16);
-    bash_r(s, &p4, &p5, 17);
-    bash_r(s, &p5, &p0, 18);
-    bash_r(s, &p0, &p1, 19);
-    bash_r(s, &p1, &p2, 20);
-    bash_r(s, &p2, &p3, 21);
-    bash_r(s, &p3, &p4, 22);
-    bash_r(s, &p4, &p5, 23);
-    bash_r(s, &p5, &p0, 24);
+    bash_r!(s, p0, p1, 1);
+    bash_r!(s, p1, p2, 2);
+    bash_r!(s, p2, p3, 3);
+    bash_r!(s, p3, p4, 4);
+    bash_r!(s, p4, p5, 5);
+    bash_r!(s, p5, p0, 6);
+    bash_r!(s, p0, p1, 7);
+    bash_r!(s, p1, p2, 8);
+    bash_r!(s, p2, p3, 9);
+    bash_r!(s, p3, p4, 10);
+    bash_r!(s, p4, p5, 11);
+    bash_r!(s, p5, p0, 12);
+    bash_r!(s, p0, p1, 13);
+    bash_r!(s, p1, p2, 14);
+    bash_r!(s, p2, p3, 15);
+    bash_r!(s, p3, p4, 16);
+    bash_r!(s, p4, p5, 17);
+    bash_r!(s, p5, p0, 18);
+    bash_r!(s, p0, p1, 19);
+    bash_r!(s, p1, p2, 20);
+    bash_r!(s, p2, p3, 21);
+    bash_r!(s, p3, p4, 22);
+    bash_r!(s, p4, p5, 23);
+    bash_r!(s, p5, p0, 24);
 }
 
 /// A2. Test
