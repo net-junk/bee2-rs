@@ -3,13 +3,14 @@ name = "bee2_bash"
 version = "0.1.0"
 authors = ["MD-Levitan <ovsyanka@protonmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["crypto", "bee2", "hash", "digest", "bash"]
+categories = ["cryptography", "no-std"]
 
 [dependencies]
 bee2_traits = { path = "../bee2_traits", version = "" }
 rand = ""
 generic-array = "0.14"
+digest = {version = "0.9", optional = true}
 
 [dev-dependencies]
 criterion = "0.3"
@@ -21,4 +22,6 @@ harness = false
 
 
 [features]
+default = []
 go-faster = []
+rust-crypto =["digest"]

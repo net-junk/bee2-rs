@@ -1,13 +1,12 @@
 extern crate bee2_traits;
 
-use crate::consts::bash_f0;
+use crate::consts::bash_f;
 pub use bee2_traits::*;
 use core::marker::PhantomData;
 use generic_array::{
     typenum::{U1, U128, U192, U2, U256},
     ArrayLength,
 };
-use std::convert::TryInto;
 
 #[allow(non_camel_case_types)]
 #[repr(u8)]
@@ -33,8 +32,6 @@ struct BashPrgState {
     buff_len: usize,
     /// Current position in buffer.
     pos: usize,
-    // /// ?
-    // stack: &[u8],
 }
 
 #[derive(Clone, Copy)]
@@ -48,23 +45,6 @@ impl BashPrgState {
         // (192 - buf_len) ==? (l + d * l / 2) / 8
         return 16 * (192 - self.buff_len) == self.l * (2 + self.d);
     }
-
-    #[inline]
-    pub fn bash_f(s: &mut [u8; 192]) {
-        if cfg!(feature = "go-faster") {
-            let x: *mut [u64; 24] = s.as_mut_ptr() as *mut [u64; 24];
-            bash_f0(unsafe { x.as_mut().unwrap() });
-        } else {
-            let mut s1: [u64; 24] = [0; 24];
-            for (dst, src) in s1.iter_mut().zip(s.chunks_exact(8)) {
-                *dst = u64::from_le_bytes(src.try_into().unwrap());
-            }
-            bash_f0(&mut s1);
-            for (src, dst) in s1.iter().zip(s.chunks_exact_mut(8)) {
-                dst.clone_from_slice(&src.to_le_bytes());
-            }
-        }
-    }
 }
 
 impl BashPrg {
@@ -73,7 +53,7 @@ impl BashPrg {
     fn prg_commit(&mut self, code: u8) {
         self.state.s[self.state.pos] ^= code;
         self.state.s[self.state.buff_len] ^= 0x80;
-        BashPrgState::bash_f(&mut self.state.s);
+        bash_f(&mut self.state.s);
         self.state.pos = 0;
     }
 }
@@ -197,7 +177,7 @@ impl PrgAbsorb for BashPrg {
             &mut self.state.s[self.state.pos..self.state.buff_len],
             &buf[0..self.state.buff_len - self.state.pos],
         );
-        BashPrgState::bash_f(&mut self.state.s);
+        bash_f(&mut self.state.s);
 
         let mut copy_size = self.state.buff_len - self.state.pos;
         count -= copy_size;
@@ -209,7 +189,7 @@ impl PrgAbsorb for BashPrg {
             );
             copy_size += self.state.buff_len;
             count -= self.state.buff_len;
-            BashPrgState::bash_f(&mut self.state.s);
+            bash_f(&mut self.state.s);
         }
 
         self.state.pos = count;
@@ -246,7 +226,7 @@ impl PrgSqueeze for BashPrg {
             &mut buf[..self.state.buff_len - self.state.pos],
             &self.state.s[self.state.pos..self.state.buff_len],
         );
-        BashPrgState::bash_f(&mut self.state.s);
+        bash_f(&mut self.state.s);
 
         let mut copy_size = self.state.buff_len - self.state.pos;
         count -= copy_size;
@@ -258,7 +238,7 @@ impl PrgSqueeze for BashPrg {
             );
             copy_size += self.state.buff_len;
             count -= self.state.buff_len;
-            BashPrgState::bash_f(&mut self.state.s);
+            bash_f(&mut self.state.s);
         }
 
         self.state.pos = count;
@@ -306,7 +286,7 @@ impl PrgEncr for BashPrg {
             &mut buf[..self.state.buff_len - self.state.pos],
             &self.state.s[self.state.pos..self.state.buff_len],
         );
-        BashPrgState::bash_f(&mut self.state.s);
+        bash_f(&mut self.state.s);
 
         let mut copy_size = self.state.buff_len - self.state.pos;
         count -= copy_size;
@@ -322,7 +302,7 @@ impl PrgEncr for BashPrg {
             );
             copy_size += self.state.buff_len;
             count -= self.state.buff_len;
-            BashPrgState::bash_f(&mut self.state.s);
+            bash_f(&mut self.state.s);
         }
 
         self.state.pos = count;
@@ -373,7 +353,7 @@ impl PrgDecr for BashPrg {
             &mut self.state.s[self.state.pos..self.state.buff_len],
             &buf[0..self.state.buff_len - self.state.pos],
         );
-        BashPrgState::bash_f(&mut self.state.s);
+        bash_f(&mut self.state.s);
 
         let mut copy_size = self.state.buff_len - self.state.pos;
         count -= copy_size;
@@ -389,7 +369,7 @@ impl PrgDecr for BashPrg {
             );
             copy_size += self.state.buff_len;
             count -= self.state.buff_len;
-            BashPrgState::bash_f(&mut self.state.s);
+            bash_f(&mut self.state.s);
         }
 
         self.state.pos = count;

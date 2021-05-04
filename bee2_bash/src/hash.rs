@@ -1,8 +1,7 @@
 extern crate bee2_traits;
 
+use crate::consts::bash_f;
 pub use bee2_traits::Hasher;
-use crate::consts::bash_f0;
-use std::convert::TryInto;
 
 #[derive(Clone)]
 struct BashState {
@@ -14,8 +13,6 @@ struct BashState {
     buff_len: usize,
     /// Current position in buffer.
     pos: usize,
-    // /// ?
-    // stack: &[u8],
 }
 
 #[derive(Clone)]
@@ -41,21 +38,10 @@ pub struct Bash512 {
 }
 
 impl BashState {
-    #[inline]
-    pub fn bash_f(s: &mut [u8; 192]) {
-        if cfg!(feature = "go-faster") {
-            let x: *mut [u64; 24] = s.as_mut_ptr() as *mut [u64; 24];
-            bash_f0(unsafe { x.as_mut().unwrap() });
-        } else {
-            let mut s1: [u64; 24] = [0; 24];
-            for (dst, src) in s1.iter_mut().zip(s.chunks_exact(8)) {
-                *dst = u64::from_le_bytes(src.try_into().unwrap());
-            }
-            bash_f0(&mut s1);
-            for (src, dst) in s1.iter().zip(s.chunks_exact_mut(8)) {
-                dst.clone_from_slice(&src.to_le_bytes());
-            }
-        }
+    fn reset(&mut self) {
+        self.pos = 0;
+        &self.s.iter_mut().for_each(|x| *x = 0);
+        &self.s1.iter_mut().for_each(|x| *x = 0);
     }
 }
 
@@ -105,7 +91,7 @@ impl Bash {
                 .for_each(|x| *x = 0);
             self.state.s1[0] = 0x40;
         }
-        BashState::bash_f(&mut self.state.s1);
+        bash_f(&mut self.state.s1);
     }
 
     fn new(l: usize) -> Self {
@@ -127,13 +113,13 @@ impl Bash {
         self.state.s[self.state.pos..self.state.pos + copy_size]
             .clone_from_slice(&buffer[..copy_size]);
 
-        BashState::bash_f(&mut self.state.s);
+        bash_f(&mut self.state.s);
         while count >= self.state.buff_len {
             self.state.s[..self.state.buff_len]
                 .clone_from_slice(&buffer[copy_size..copy_size + self.state.buff_len]);
             copy_size += self.state.buff_len;
             count -= self.state.buff_len;
-            BashState::bash_f(&mut self.state.s);
+            bash_f(&mut self.state.s);
         }
 
         self.state.pos = count;
@@ -245,6 +231,55 @@ impl Hasher for Bash512 {
     fn hash(hash: &mut [u8], src: impl AsRef<[u8]>) {
         Bash::hash(256, hash, src);
     }
+}
+
+#[cfg(feature = "rust-crypto")]
+mod crypto {
+    use digest::generic_array::typenum::{U32, U48, U64};
+    use digest::generic_array::GenericArray;
+    pub use digest::{self, Digest};
+    use digest::{BlockInput, FixedOutputDirty, Reset, Update};
+
+    use crate::hash::bee2_traits::Hasher;
+    use crate::hash::{Bash256, Bash384, Bash512};
+
+    macro_rules! bash_crypto {
+        ($bash_x: ty, $size: ty) => {
+            impl Default for $bash_x {
+                fn default() -> Self {
+                    <$bash_x as Hasher>::new()
+                }
+            }
+
+            impl BlockInput for $bash_x {
+                type BlockSize = $size;
+            }
+
+            impl Update for $bash_x {
+                fn update(&mut self, input: impl AsRef<[u8]>) {
+                    self.step_h(input)
+                }
+            }
+
+            impl FixedOutputDirty for $bash_x {
+                type OutputSize = $size;
+
+                fn finalize_into_dirty(&mut self, out: &mut GenericArray<u8, $size>) {
+                    self.step_g(out);
+                }
+            }
+            impl Reset for $bash_x {
+                fn reset(&mut self) {
+                    self.bash.state.reset();
+                }
+            }
+
+            //digest::impl_write!($bash_x);
+        };
+    }
+    bash_crypto!(Bash256, U32);
+    bash_crypto!(Bash384, U48);
+    bash_crypto!(Bash512, U64);
 }
 
 #[cfg(test)]
@@ -455,5 +490,27 @@ mod test {
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
         Bash512::hash(&mut hash, &s[..192]);
         assert_eq!(hash, unsafe { *(l_256_3.as_ptr() as *const [u8; 64]) });
+    }
+
+    #[cfg(feature = "rust-crypto")]
+    #[test]
+    fn test_digest() {
+        use digest::Digest;
+
+        let mut hasher = <Bash512 as Digest>::new();
+
+        hasher.update(b"hello world");
+
+        let result = hasher.finalize();
+
+        assert_eq!(
+            result[..],
+            [
+                105, 192, 153, 247, 58, 131, 112, 54, 13, 59, 211, 219, 104, 136, 60, 248, 112, 69,
+                221, 205, 160, 25, 189, 143, 55, 174, 12, 70, 1, 241, 16, 222, 93, 89, 6, 160, 100,
+                253, 68, 220, 49, 58, 146, 203, 76, 11, 252, 217, 140, 95, 54, 195, 74, 110, 153,
+                207, 111, 179, 246, 193, 99, 93, 221, 84
+            ]
+        );
     }
 }
