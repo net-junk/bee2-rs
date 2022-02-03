@@ -1,6 +1,6 @@
 extern crate criterion;
 
-use bee2_bash::{Bash256, Bash384, Bash512, bash_f0};
+use bee2_bash::{bash_f0, Bash256, Bash384, Bash512};
 use bee2_bash::{
     BashPrgAEAD2561, BashPrgAEAD2562, BashPrgAEAD3841, BashPrgAEAD3842, BashPrgAEAD5121,
     BashPrgAEAD5122,
@@ -31,7 +31,6 @@ fn bash_512(bytes: &[u8]) {
 fn bashf_test(bytes: &mut [u64; 24]) {
     bash_f0(bytes)
 }
-
 
 fn bench_bash(c: &mut Criterion) {
     let mut bytes: [u8; 1024] = [0; 1024];

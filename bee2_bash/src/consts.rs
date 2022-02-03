@@ -108,7 +108,6 @@ fn bash_s_test() {
     assert_eq!(w2_, s[2]);
 }
 
-
 #[inline]
 #[allow(dead_code)]
 fn bash_r(s: &mut [u64; 24], p: &dyn Fn(u64) -> u64, p_next: &dyn Fn(u64) -> u64, i: u8) {
@@ -307,6 +306,25 @@ pub fn bash_f0(s: &mut [u64; 24]) {
     bash_r!(s, p3, p4, 22);
     bash_r!(s, p4, p5, 23);
     bash_r!(s, p5, p0, 24);
+}
+
+#[inline]
+pub fn bash_f(s: &mut [u8; 192]) {
+    if cfg!(feature = "go-faster") {
+        let x: *mut [u64; 24] = s.as_mut_ptr() as *mut [u64; 24];
+        bash_f0(unsafe { x.as_mut().unwrap() });
+    } else {
+        let mut s1: [u64; 24] = [0; 24];
+        for (dst, src) in s1.iter_mut().zip(s.chunks_exact(8)) {
+            *dst = u64::from_le_bytes([
+                src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7],
+            ]);
+        }
+        bash_f0(&mut s1);
+        for (src, dst) in s1.iter().zip(s.chunks_exact_mut(8)) {
+            dst.clone_from_slice(&src.to_le_bytes());
+        }
+    }
 }
 
 /// A2. Test
