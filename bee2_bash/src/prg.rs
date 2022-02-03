@@ -1,12 +1,7 @@
-extern crate bee2_traits;
+pub use bee2_core::error::{Error, IncorrectTag, InvalidCommand, InvalidLength};
+pub use bee2_traits::*;
 
 use crate::consts::bash_f;
-pub use bee2_traits::*;
-use core::marker::PhantomData;
-use generic_array::{
-    typenum::{U1, U128, U192, U2, U256},
-    ArrayLength,
-};
 
 #[allow(non_camel_case_types)]
 #[repr(u8)]
@@ -59,24 +54,33 @@ impl BashPrg {
 }
 
 impl PrgStart for BashPrg {
-    fn start(l: usize, d: usize, ann_: impl AsRef<[u8]>, key_: impl AsRef<[u8]>) -> Self {
+    fn start(
+        l: usize,
+        d: usize,
+        ann_: impl AsRef<[u8]>,
+        key_: impl AsRef<[u8]>,
+    ) -> Result<Self, InvalidLength> {
         if l != 128 && l != 192 && l != 256 {
-            panic!(format!("Incorrect param of security {:}", l).to_owned());
+            // panic!(format!("Incorrect param of security {:}", l).to_owned());
+            return Err(InvalidLength);
         }
 
         if d != 1 && d != 2 {
-            panic!(format!("Incorrect param of capacity {:}", d).to_owned());
+            // panic!(format!("Incorrect param of capacity {:}", d).to_owned());
+            return Err(InvalidLength);
         }
 
         let ann = ann_.as_ref();
         let key = key_.as_ref();
 
         if ann.len() % 4 != 0 || ann.len() > 60 || (key.len() != 0 && key.len() < l / 8) {
-            panic!(format!("Incorrect len of annotation {:}", ann.len()).to_owned());
+            // panic!(format!("Incorrect len of annotation {:}", ann.len()).to_owned());
+            return Err(InvalidLength);
         }
 
         if key.len() % 4 != 0 || key.len() > 60 {
-            panic!(format!("Incorrect len of key {:}", ann.len()).to_owned());
+            // panic!(format!("Incorrect len of key {:}", ann.len()).to_owned());
+            return Err(InvalidLength);
         }
 
         // pos <- 8 + |ann| + |key|
@@ -90,7 +94,7 @@ impl PrgStart for BashPrg {
         s[192 - 8] = (l / 4 + d) as u8;
         // s[pos..) <- 0
         // s[pos..].iter_mut().for_each(|x| *x = 0);
-        return BashPrg {
+        Ok(BashPrg {
             state: BashPrgState {
                 l: l,
                 d: d,
@@ -102,13 +106,18 @@ impl PrgStart for BashPrg {
                     _ => (192 - l * (2 + d) / 16),
                 },
             },
-        };
+        })
     }
 }
 
 impl BashPrg {
-    pub fn new(l: usize, d: usize, ann_: impl AsRef<[u8]>, key_: impl AsRef<[u8]>) -> Self {
-        return BashPrg::start(l, d, ann_, key_);
+    pub fn new(
+        l: usize,
+        d: usize,
+        ann_: impl AsRef<[u8]>,
+        key_: impl AsRef<[u8]>,
+    ) -> Result<Self, InvalidLength> {
+        BashPrg::start(l, d, ann_, key_)
     }
 }
 
@@ -125,39 +134,45 @@ fn mem_cpy(a: &mut [u8], b: &[u8]) {
 }
 
 impl PrgRestart for BashPrg {
-    fn restart(&mut self, ann_: impl AsRef<[u8]>, key_: impl AsRef<[u8]>) {
+    fn restart(
+        &mut self,
+        ann_: impl AsRef<[u8]>,
+        key_: impl AsRef<[u8]>,
+    ) -> Result<(), InvalidLength> {
         let ann = ann_.as_ref();
         let key = key_.as_ref();
 
         if ann.len() % 4 != 0 || ann.len() > 60 || (key.len() != 0 && key.len() < self.state.l / 8)
         {
-            panic!(format!("Incorrect len of annotation {:}", ann.len()).to_owned());
+            // panic!(format!("Incorrect len of annotation {:}", ann.len()).to_owned());
+            return Err(InvalidLength);
         }
 
         if key.len() % 4 != 0 || key.len() > 60 {
-            panic!(format!("Incorrect len of key {:}", ann.len()).to_owned());
+            // panic!(format!("Incorrect len of key {:}", ann.len()).to_owned());
+            return Err(InvalidLength);
         }
 
         if key.len() != 0 {
-            // TODO: remove as u8
             self.prg_commit(PrgCommands::BASH_PRG_KEY as u8);
         } else {
-            // TODO: remove as u8
             self.prg_commit(PrgCommands::BASH_PRG_NULL as u8);
         }
+
         // pos <- 8 + |ann| + |key|
         self.state.pos = 1 + ann.len() + key.len();
         // s[0..pos) <- s[0..pos) ^ <|ann|/2 + |key|/32>_8  || ann || key
         self.state.s[0] ^= (ann.len() * 4 + key.len() / 4) as u8;
         mem_xor(&mut self.state.s[1..1 + ann.len()], ann);
         mem_xor(&mut self.state.s[1 + ann.len()..self.state.pos], key);
+
+        Ok(())
     }
 }
 
 impl PrgAbsorb for BashPrg {
     fn absorb_start(&mut self) {
-        // TODO: remove as u8
-        self.prg_commit(PrgCommands::BASH_PRG_DATA as u8)
+        self.prg_commit(PrgCommands::BASH_PRG_DATA as u8);
     }
 
     fn absorb_step(&mut self, buf_: impl AsRef<[u8]>) {
@@ -209,8 +224,7 @@ impl PrgAbsorb for BashPrg {
 
 impl PrgSqueeze for BashPrg {
     fn squeeze_start(&mut self) {
-        // TODO: remove as u8
-        self.prg_commit(PrgCommands::BASH_PRG_OUT as u8)
+        self.prg_commit(PrgCommands::BASH_PRG_OUT as u8);
     }
 
     fn squeeze_step(&mut self, buf: &mut [u8]) {
@@ -257,12 +271,14 @@ impl PrgSqueeze for BashPrg {
 }
 
 impl PrgEncr for BashPrg {
-    fn encr_start(&mut self) {
+    fn encr_start(&mut self) -> Result<(), InvalidCommand> {
         if self.state.is_key_mode() == false {
-            panic!("State not in key mode");
+            // panic!("State not in key mode");
+            return Err(InvalidCommand);
         }
-        // TODO: remove as u8
-        self.prg_commit(PrgCommands::BASH_PRG_TEXT as u8)
+        self.prg_commit(PrgCommands::BASH_PRG_TEXT as u8);
+
+        Ok(())
     }
 
     fn encr_step(&mut self, buf: &mut [u8]) {
@@ -318,19 +334,23 @@ impl PrgEncr for BashPrg {
         }
     }
 
-    fn encr(&mut self, buf: &mut [u8]) {
-        self.encr_start();
+    fn encr(&mut self, buf: &mut [u8]) -> Result<(), InvalidCommand> {
+        self.encr_start()?;
         self.encr_step(buf);
+
+        Ok(())
     }
 }
 
 impl PrgDecr for BashPrg {
-    fn decr_start(&mut self) {
+    fn decr_start(&mut self) -> Result<(), InvalidCommand> {
         if self.state.is_key_mode() == false {
-            panic!("State not in key mode");
+            // panic!("State not in key mode");
+            return Err(InvalidCommand);
         }
-        // TODO: remove as u8
-        self.prg_commit(PrgCommands::BASH_PRG_TEXT as u8)
+        self.prg_commit(PrgCommands::BASH_PRG_TEXT as u8);
+
+        Ok(())
     }
 
     fn decr_step(&mut self, buf: &mut [u8]) {
@@ -385,9 +405,11 @@ impl PrgDecr for BashPrg {
         }
     }
 
-    fn decr(&mut self, buf: &mut [u8]) {
-        self.decr_start();
+    fn decr(&mut self, buf: &mut [u8]) -> Result<(), InvalidCommand> {
+        self.decr_start()?;
         self.decr_step(buf);
+
+        Ok(())
     }
 }
 
@@ -414,9 +436,9 @@ pub fn programming(
     y1: &mut [u8],
     y2: &mut [u8],
     k1: &mut [u8],
-) {
+) -> Result<(), Error> {
     // Step 1.
-    let mut alpha = BashPrg::start(256, 2, [], k);
+    let mut alpha = BashPrg::start(256, 2, [], k)?;
     // Step 2.
     alpha.absorb(i);
     // Step 3.
@@ -424,118 +446,110 @@ pub fn programming(
     // Step 4.
     alpha.squeeze(k1);
     // Step 5.
-    let mut beta = BashPrg::start(128, 1, a1, k1);
+    let mut beta = BashPrg::start(128, 1, a1, k1)?;
     // Step 6.
     let mut gamma = beta;
     // Step 7.
-    gamma.restart(a2, []);
+    gamma.restart(a2, [])?;
     // Step 8.
-    beta.encr(y1);
+    beta.encr(y1)?;
     // Step 9.
-    gamma.encr(y2);
+    gamma.encr(y2)?;
+
+    Ok(())
 }
 
-#[derive(Clone)]
-pub struct BashPrgHash<SecurityLevel, Capacity>
-where
-    SecurityLevel: ArrayLength<u8>,
-    Capacity: ArrayLength<u8>,
-{
-    prg: BashPrg,
-    l: PhantomData<SecurityLevel>,
-    d: PhantomData<Capacity>,
-}
-
-impl<L, D> PrgHasher for BashPrgHash<L, D>
-where
-    L: ArrayLength<u8>,
-    D: ArrayLength<u8>,
-{
-    fn new(ann: impl AsRef<[u8]>) -> Self {
-        BashPrgHash {
-            l: Default::default(),
-            d: Default::default(),
-            prg: BashPrg::start(L::to_usize(), D::to_usize() as usize, ann, []),
+macro_rules! bash_prg_hash {
+    ($full_name:ident, $security_level:expr, $capacity:expr) => {
+        #[derive(Clone)]
+        pub struct $full_name {
+            prg: BashPrg,
         }
-    }
 
-    fn hash(&mut self, data: impl AsRef<[u8]>, hash: &mut [u8]) {
-        self.prg.absorb(data);
-        self.prg.squeeze(hash);
-        self.prg.ratchet();
-    }
-}
+        impl PrgHasher for $full_name {
+            fn new(ann: impl AsRef<[u8]>) -> Result<Self, InvalidLength> {
+                Ok(Self {
+                    prg: BashPrg::start($security_level, $capacity, ann, [])?,
+                })
+            }
 
-pub type BashPrgHash2561 = BashPrgHash<U128, U1>;
-pub type BashPrgHash2562 = BashPrgHash<U128, U2>;
-pub type BashPrgHash3841 = BashPrgHash<U192, U1>;
-pub type BashPrgHash3842 = BashPrgHash<U192, U2>;
-pub type BashPrgHash5121 = BashPrgHash<U256, U1>;
-pub type BashPrgHash5122 = BashPrgHash<U256, U2>;
-
-#[derive(Clone)]
-pub struct BashPrgAEAD<SecurityLevel, Capacity>
-where
-    SecurityLevel: ArrayLength<u8>,
-    Capacity: ArrayLength<u8>,
-{
-    prg: BashPrg,
-    l: PhantomData<SecurityLevel>,
-    d: PhantomData<Capacity>,
-}
-
-impl<L, D> PrgAEAD for BashPrgAEAD<L, D>
-where
-    L: ArrayLength<u8>,
-    D: ArrayLength<u8>,
-{
-    fn new(ann: impl AsRef<[u8]>, key: impl AsRef<[u8]>) -> Self {
-        BashPrgAEAD {
-            l: Default::default(),
-            d: Default::default(),
-            prg: BashPrg::start(L::to_usize(), D::to_usize() as usize, ann, key),
+            fn hash(&mut self, data: impl AsRef<[u8]>, hash: &mut [u8]) {
+                self.prg.absorb(data);
+                self.prg.squeeze(hash);
+                self.prg.ratchet();
+            }
         }
-    }
-
-    fn encrypt(
-        &mut self,
-        plaintext: impl AsRef<[u8]>,
-        header: impl AsRef<[u8]>,
-        ciphertext: &mut [u8],
-        tag: &mut [u8],
-    ) {
-        self.prg.absorb(header);
-        ciphertext.clone_from_slice(&plaintext.as_ref());
-        self.prg.encr(ciphertext);
-        self.prg.squeeze(tag);
-    }
-
-    fn decrypt(
-        &mut self,
-        ciphertext: impl AsRef<[u8]>,
-        header: impl AsRef<[u8]>,
-        tag_: impl AsRef<[u8]>,
-        plaintext: &mut [u8],
-    ) {
-        self.prg.absorb(header);
-        plaintext.clone_from_slice(&ciphertext.as_ref());
-        self.prg.decr(plaintext);
-        let tag = tag_.as_ref();
-        let mut tag_get: Box<[u8]> = vec![0; tag.len()].into_boxed_slice();
-        self.prg.squeeze(tag_get.as_mut());
-        if tag_get.as_ref().eq(tag) == false {
-            plaintext.iter_mut().for_each(|x| *x = 0);
-            panic!(format!("Incorrect tag").to_owned());
-        }
-    }
+    };
 }
 
-pub type BashPrgAEAD2561 = BashPrgAEAD<U128, U1>;
-pub type BashPrgAEAD2562 = BashPrgAEAD<U128, U2>;
-pub type BashPrgAEAD3841 = BashPrgAEAD<U192, U1>;
-pub type BashPrgAEAD3842 = BashPrgAEAD<U192, U2>;
-pub type BashPrgAEAD5121 = BashPrgAEAD<U256, U1>;
-pub type BashPrgAEAD5122 = BashPrgAEAD<U256, U2>;
+bash_prg_hash!(BashPrgHash2561, 128, 1);
+bash_prg_hash!(BashPrgHash2562, 128, 2);
+bash_prg_hash!(BashPrgHash3841, 192, 1);
+bash_prg_hash!(BashPrgHash3842, 192, 2);
+bash_prg_hash!(BashPrgHash5121, 256, 1);
+bash_prg_hash!(BashPrgHash5122, 256, 2);
+
+macro_rules! bash_prg_aead {
+    ($full_name:ident, $security_level:expr, $capacity:expr) => {
+        #[derive(Clone)]
+        pub struct $full_name {
+            prg: BashPrg,
+        }
+
+        impl PrgAEAD for $full_name {
+            fn new(ann: impl AsRef<[u8]>, key: impl AsRef<[u8]>) -> Result<Self, InvalidLength> {
+                Ok(Self {
+                    prg: BashPrg::start($security_level, $capacity, ann, key)?,
+                })
+            }
+
+            fn encrypt(
+                &mut self,
+                plaintext: impl AsRef<[u8]>,
+                header: impl AsRef<[u8]>,
+                ciphertext: &mut [u8],
+                tag: &mut [u8],
+            ) -> Result<(), Error> {
+                self.prg.absorb(header);
+                ciphertext.clone_from_slice(&plaintext.as_ref());
+                self.prg.encr(ciphertext)?;
+                self.prg.squeeze(tag);
+
+                Ok(())
+            }
+
+            fn decrypt(
+                &mut self,
+                ciphertext: impl AsRef<[u8]>,
+                header: impl AsRef<[u8]>,
+                tag_: impl AsRef<[u8]>,
+                plaintext: &mut [u8],
+            ) -> Result<(), Error> {
+                self.prg.absorb(header);
+                plaintext.clone_from_slice(&ciphertext.as_ref());
+                self.prg.decr(plaintext)?;
+                let tag = tag_.as_ref();
+                let mut tag_get: Box<[u8]> = vec![0; tag.len()].into_boxed_slice();
+                self.prg.squeeze(tag_get.as_mut());
+                if tag_get.as_ref().eq(tag) == false {
+                    plaintext.iter_mut().for_each(|x| *x = 0);
+
+                    // panic!(format!("Incorrect tag").to_owned());
+                    return Err(Error::from(IncorrectTag));
+                }
+
+                Ok(())
+            }
+        }
+    };
+}
+
+bash_prg_aead!(BashPrgAEAD2561, 128, 1);
+bash_prg_aead!(BashPrgAEAD2562, 128, 2);
+bash_prg_aead!(BashPrgAEAD3841, 192, 1);
+bash_prg_aead!(BashPrgAEAD3842, 192, 2);
+bash_prg_aead!(BashPrgAEAD5121, 256, 1);
+bash_prg_aead!(BashPrgAEAD5122, 256, 2);
 
 #[cfg(test)]
 mod test {
@@ -599,7 +613,8 @@ mod test {
             &mut y1,
             &mut y2,
             &mut k1,
-        );
+        )
+        .unwrap();
 
         assert_eq!(k1, unsafe { *(k1_.as_ptr() as *const [u8; 16]) });
         assert_eq!(y1, unsafe { *(y1_.as_ptr() as *const [u8; 23]) });
@@ -618,7 +633,7 @@ mod test {
         let mut hash: [u8; 32] = [0; 32];
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut hasher = BashPrgHash2562::new([]);
+        let mut hasher = BashPrgHash2562::new([]).unwrap();
         hasher.hash(&s[..0], &mut hash);
 
         assert_eq!(hash, unsafe { *(l_128_2.as_ptr() as *const [u8; 32]) });
@@ -636,7 +651,7 @@ mod test {
         let mut hash: [u8; 32] = [0; 32];
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut hasher = BashPrgHash2562::new([]);
+        let mut hasher = BashPrgHash2562::new([]).unwrap();
         hasher.hash(&s[..127], &mut hash);
 
         assert_eq!(hash, unsafe { *(l_128_2_127.as_ptr() as *const [u8; 32]) });
@@ -654,7 +669,7 @@ mod test {
         let mut hash: [u8; 32] = [0; 32];
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut hasher = BashPrgHash2562::new([]);
+        let mut hasher = BashPrgHash2562::new([]).unwrap();
         hasher.hash(&s[..128], &mut hash);
 
         assert_eq!(hash, unsafe { *(l_128_2_128.as_ptr() as *const [u8; 32]) });
@@ -672,7 +687,7 @@ mod test {
         let mut hash: [u8; 32] = [0; 32];
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut hasher = BashPrgHash2562::new([]);
+        let mut hasher = BashPrgHash2562::new([]).unwrap();
         hasher.hash(&s[..150], &mut hash);
 
         assert_eq!(hash, unsafe { *(l_128_2_150.as_ptr() as *const [u8; 32]) });
@@ -692,7 +707,7 @@ mod test {
         let mut hash: [u8; 48] = [0; 48];
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut hasher = BashPrgHash3841::new([]);
+        let mut hasher = BashPrgHash3841::new([]).unwrap();
         hasher.hash(&s[..143], &mut hash);
 
         assert_eq!(hash, unsafe { *(l_.as_ptr() as *const [u8; 48]) });
@@ -712,7 +727,7 @@ mod test {
         let mut hash: [u8; 48] = [0; 48];
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut hasher = BashPrgHash3841::new([]);
+        let mut hasher = BashPrgHash3841::new([]).unwrap();
         hasher.hash(&s[..144], &mut hash);
 
         assert_eq!(hash, unsafe { *(l_.as_ptr() as *const [u8; 48]) });
@@ -732,7 +747,7 @@ mod test {
         let mut hash: [u8; 48] = [0; 48];
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut hasher = BashPrgHash3841::new([]);
+        let mut hasher = BashPrgHash3841::new([]).unwrap();
         hasher.hash(&s[..150], &mut hash);
 
         assert_eq!(hash, unsafe { *(l_.as_ptr() as *const [u8; 48]) });
@@ -774,8 +789,8 @@ mod test {
 
         let s: [u8; 192] = unsafe { *(S.as_ptr() as *const [u8; 192]) };
 
-        let mut aead = BashPrgAEAD5121::new(&s[0..16], &s[32..64]);
-        aead.encrypt(x, &s[64..113], &mut y, &mut t);
+        let mut aead = BashPrgAEAD5121::new(&s[0..16], &s[32..64]).unwrap();
+        aead.encrypt(x, &s[64..113], &mut y, &mut t).unwrap();
 
         assert_eq!(y, unsafe { *(y_.as_ptr() as *const [u8; 192]) });
     }

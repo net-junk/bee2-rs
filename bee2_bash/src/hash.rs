@@ -40,8 +40,8 @@ pub struct Bash512 {
 impl BashState {
     fn reset(&mut self) {
         self.pos = 0;
-        &self.s.iter_mut().for_each(|x| *x = 0);
-        &self.s1.iter_mut().for_each(|x| *x = 0);
+        self.s.iter_mut().for_each(|x| *x = 0);
+        self.s1.iter_mut().for_each(|x| *x = 0);
     }
 }
 
