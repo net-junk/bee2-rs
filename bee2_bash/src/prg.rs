@@ -38,7 +38,7 @@ pub struct BashPrg {
 impl BashPrgState {
     fn is_key_mode(&self) -> bool {
         // (192 - buf_len) ==? (l + d * l / 2) / 8
-        return 16 * (192 - self.buff_len) == self.l * (2 + self.d);
+        16 * (192 - self.buff_len) == self.l * (2 + self.d)
     }
 }
 
@@ -73,7 +73,7 @@ impl PrgStart for BashPrg {
         let ann = ann_.as_ref();
         let key = key_.as_ref();
 
-        if ann.len() % 4 != 0 || ann.len() > 60 || (key.len() != 0 && key.len() < l / 8) {
+        if ann.len() % 4 != 0 || ann.len() > 60 || (!key.is_empty() && key.len() < l / 8) {
             // panic!(format!("Incorrect len of annotation {:}", ann.len()).to_owned());
             return Err(InvalidLength);
         }
@@ -88,18 +88,18 @@ impl PrgStart for BashPrg {
         let mut s = [0; 192];
         // s[0..pos) <- <|ann|/2 + |key|/32>_8 || ann || key
         s[0] = (ann.len() * 4 + key.len() / 4) as u8;
-        s[1..1 + ann.len()].copy_from_slice(&ann[..]);
-        s[1 + ann.len()..1 + ann.len() + key.len()].copy_from_slice(&key[..]);
+        s[1..1 + ann.len()].copy_from_slice(ann);
+        s[1 + ann.len()..1 + ann.len() + key.len()].copy_from_slice(key);
         // s[1472..) <- <l / 4 + d>_{64}
         s[192 - 8] = (l / 4 + d) as u8;
         // s[pos..) <- 0
         // s[pos..].iter_mut().for_each(|x| *x = 0);
         Ok(BashPrg {
             state: BashPrgState {
-                l: l,
-                d: d,
-                pos: pos,
-                s: s,
+                l,
+                d,
+                pos,
+                s,
                 t: [0; 192],
                 buff_len: match key.len() {
                     0 => (192 - d * l / 4),
@@ -142,7 +142,7 @@ impl PrgRestart for BashPrg {
         let ann = ann_.as_ref();
         let key = key_.as_ref();
 
-        if ann.len() % 4 != 0 || ann.len() > 60 || (key.len() != 0 && key.len() < self.state.l / 8)
+        if ann.len() % 4 != 0 || ann.len() > 60 || (!key.is_empty() && key.len() < self.state.l / 8)
         {
             // panic!(format!("Incorrect len of annotation {:}", ann.len()).to_owned());
             return Err(InvalidLength);
@@ -153,7 +153,7 @@ impl PrgRestart for BashPrg {
             return Err(InvalidLength);
         }
 
-        if key.len() != 0 {
+        if !key.is_empty() {
             self.prg_commit(PrgCommands::BASH_PRG_KEY as u8);
         } else {
             self.prg_commit(PrgCommands::BASH_PRG_NULL as u8);
@@ -272,7 +272,7 @@ impl PrgSqueeze for BashPrg {
 
 impl PrgEncr for BashPrg {
     fn encr_start(&mut self) -> Result<(), InvalidCommand> {
-        if self.state.is_key_mode() == false {
+        if !self.state.is_key_mode() {
             // panic!("State not in key mode");
             return Err(InvalidCommand);
         }
@@ -344,7 +344,7 @@ impl PrgEncr for BashPrg {
 
 impl PrgDecr for BashPrg {
     fn decr_start(&mut self) -> Result<(), InvalidCommand> {
-        if self.state.is_key_mode() == false {
+        if !self.state.is_key_mode() {
             // panic!("State not in key mode");
             return Err(InvalidCommand);
         }
@@ -423,7 +423,7 @@ impl PrgRatchet for BashPrg {
 
 impl Prg for BashPrg {
     fn output_size() -> usize {
-        return 0;
+        0_usize
     }
 }
 

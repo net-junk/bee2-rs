@@ -61,7 +61,7 @@ impl Default for Bash {
 impl Bash {
     fn bash_start(l: usize) -> Result<Self, String> {
         if l % 16 != 0 || l > 256 {
-            return Err(format!("Incorrect param of security {:}", l).to_owned());
+            return Err(format!("Incorrect param of security {:}", l));
         }
 
         let mut s = [0; 192];
@@ -71,7 +71,7 @@ impl Bash {
             state: BashState {
                 buff_len: 192 - l / 2,
                 pos: 0,
-                s: s,
+                s,
                 s1: [0; 192],
             },
         })
