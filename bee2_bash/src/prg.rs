@@ -473,6 +473,10 @@ macro_rules! bash_prg_hash {
                 })
             }
 
+            fn update(&mut self, data: impl AsRef<[u8]>) {
+                self.prg.absorb(data);
+            }
+
             fn hash(&mut self, data: impl AsRef<[u8]>, hash: &mut [u8]) {
                 self.prg.absorb(data);
                 self.prg.squeeze(hash);

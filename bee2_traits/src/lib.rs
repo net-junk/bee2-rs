@@ -32,6 +32,14 @@ pub trait PrgHasher: Sized {
     /// * ann - annotation, ann.len() % 4 == 0 && ann.len() <= 60
     fn new(ann: impl AsRef<[u8]>) -> Result<Self, InvalidLength>;
 
+    /// Update hash with new data
+    /// 
+    /// # Arguments
+    /// 
+    /// * data - data to hash
+    fn update(&mut self, data: impl AsRef<[u8]>);
+
+
     /// Calculate hash.
     ///
     /// # Arguments
