@@ -185,21 +185,15 @@ fn g_21(u: &mut u32) -> u32 {
 }
 
 #[inline]
-fn belt_block_encr(y: &mut [u32; 4], x: & [u32; 4], key: & [u32; 8])
+pub fn belt_block_encr(buf: &mut [u32; 4], key: & [u32; 8])
 {
-	let mut a: u32;
-    let mut b: u32;
-    let mut c: u32;
-    let mut d: u32;
-    let mut e: u32;
-
-	a = x[0];
-    b = x[1];
-    c = x[2];
-    d = x[3];  
-    e = 0;         
-
-	encr_round(&mut a, &mut b, &mut c, &mut d, &mut e, 
+	let mut a: u32 = buf[0];
+    let mut b: u32 = buf[1];
+    let mut c: u32 = buf[2];
+    let mut d: u32 = buf[3];
+    let mut e: u32 = 0;
+	
+  	encr_round(&mut a, &mut b, &mut c, &mut d, &mut e, 
                & key[0], & key[1], & key[2], & key[3], & key[4], & key[5], & key[6], 0);
 	encr_round(&mut b, &mut d, &mut a, &mut c, &mut e,
                & key[7], & key[0], & key[1], & key[2], & key[3], & key[4], & key[5], 1);
@@ -216,26 +210,20 @@ fn belt_block_encr(y: &mut [u32; 4], x: & [u32; 4], key: & [u32; 8])
 	encr_round(&mut c, &mut a, &mut d, &mut b, &mut e, 
                & key[1], & key[2], & key[3], & key[4], & key[5], & key[6], & key[7], 7);
 
-	y[0] = b;
-    y[1] = d;
-    y[2] = a;
-    y[3] = c;   
+	buf[0] = b;
+    buf[1] = d;
+    buf[2] = a;
+    buf[3] = c;   
 }
 
 #[inline]
-fn belt_block_decr(y: &mut [u32; 4], x: & [u32; 4], key: & [u32; 8])
+pub fn belt_block_decr(buf: &mut [u32; 4], key: & [u32; 8])
 {
-	let mut a: u32;
-    let mut b: u32;
-    let mut c: u32; 
-    let mut d: u32;
-    let mut e: u32;
-
-	a = x[0];
-    b = x[1];
-    c = x[2];
-    d = x[3];  
-    e = 0;    
+	let mut a: u32 = buf[0];
+    let mut b: u32 = buf[1];
+    let mut c: u32 = buf[2]; 
+    let mut d: u32 = buf[3];
+    let mut e: u32 = 0;
 
     decr_round(&mut a, &mut b, &mut c, &mut d, &mut e,
                & key[1], & key[2], & key[3], & key[4], & key[5], & key[6], & key[7], 7);
@@ -254,28 +242,29 @@ fn belt_block_decr(y: &mut [u32; 4], x: & [u32; 4], key: & [u32; 8])
 	decr_round(&mut b, &mut d, &mut a, &mut c, &mut e,
                & key[0], & key[1], & key[2], & key[3], & key[4], & key[5], & key[6], 0);
 
-    y[0] = c;
-    y[1] = a;
-    y[2] = d;
-    y[3] = b;  
+    buf[0] = c;
+    buf[1] = a;
+    buf[2] = d;
+    buf[3] = b;      
 }
 
 #[test]
 fn a1_table_test() {
-    let x =  [
+    let mut x_then_y: [u32; 4] =  [
         0xB194BAC8u32.to_be(),
         0x0A08F53Bu32.to_be(),
         0x366D008Eu32.to_be(),
         0x584A5DE4u32.to_be(),
     ];
-    let y_ =  [
+
+    const Y: [u32; 4] =  [
         0x69CCA1C9u32.to_be(),
         0x3557C9E3u32.to_be(),
         0xD66BC3E0u32.to_be(),
         0xFA88FA6Eu32.to_be(),
     ]; 
 
-    let key = [
+    const KEY: [u32; 8] = [
         0xE9DEE72Cu32.to_be(),
         0x8F0C0FA6u32.to_be(),
         0x2DDB49F4u32.to_be(),
@@ -285,28 +274,28 @@ fn a1_table_test() {
         0x39CBA383u32.to_be(),
         0x03A98BF6u32.to_be(),       
     ];
-
-    let mut y = [0, 0, 0, 0];    
-    belt_block_encr(&mut y, & x, & key);
-    assert_eq!(y_, y);    
+  
+    belt_block_encr(&mut x_then_y, & KEY);
+    assert_eq!(Y, x_then_y);    
 }
 
 #[test]
 fn a4_table_test() {
-    let y =  [
+    let mut y_then_x: [u32; 4] =  [
         0xE12BDC1Au32.to_be(),
         0xE28257ECu32.to_be(),
         0x703FCCF0u32.to_be(),
         0x95EE8DF1u32.to_be(),
     ];
-    let x_ =  [
+
+    const X: [u32; 4] =  [
         0x0DC53006u32.to_be(),
         0x00CAB840u32.to_be(),
         0xB38448E5u32.to_be(),
         0xE993F421u32.to_be(),
     ];   
 
-    let key = [
+    const KEY: [u32; 8] = [
         0x92BD9B1Cu32.to_be(),
         0xE5D14101u32.to_be(),
         0x5445FBC9u32.to_be(),
@@ -317,7 +306,6 @@ fn a4_table_test() {
         0x90405511u32.to_be(),       
     ];
 
-    let mut x = [0, 0, 0, 0];
-    belt_block_decr(&mut x, & y, & key);
-    assert_eq!(x_, x);    
+    belt_block_decr(&mut y_then_x, & KEY);
+    assert_eq!(X, y_then_x); 
 }

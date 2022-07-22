@@ -3,7 +3,20 @@ name = "bee2_belt"
 version = "0.1.0"
 authors = ["MD-Levitan <ovsyanka@protonmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["crypto", "bee2", "hash", "digest", "belt"]
+categories = ["cryptography", "no-std"]
 
 [dependencies]
+bee2_traits = { path = "../bee2_traits", version = "0.1.1" }
+bee2_core = { path = "../bee2_core", version = "0.1.0" }
+#digest = {version = "0.10.0", optional = true}
+
+[dev-dependencies]
+bee2_traits = { path = "../bee2_traits", version = "0.1.0" }
+criterion = "0.3"
+rand = "0.8.4"
+
+[features]
+default = []
+go-faster = []
+# rust-crypto =["digest"]
